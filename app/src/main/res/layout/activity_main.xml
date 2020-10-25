@@ -5,7 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/colorPrimary"
-    tools:context=".activities.MainActivity">
+    tools:context=".activities.MainActivity"
+    android:focusableInTouchMode="true">
 
     <TextView
         android:id="@+id/textNotes"
@@ -19,7 +20,7 @@
         android:text="@string/notes"
         android:textColor="@color/colorWhite"
         android:textSize="@dimen/_20ssp"
-        app:layout_constraintTop_toTopOf="parent"/>
+        app:layout_constraintTop_toTopOf="parent" />
 
     <LinearLayout
         android:id="@+id/layoutSearch"
@@ -55,7 +56,7 @@
             android:inputType="text"
             android:textColor="@color/colorWhite"
             android:textColorHint="@color/colorTextHint"
-            android:textSize="@dimen/_13ssp"/>
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 
