@@ -1,5 +1,4 @@
 package com.example.notes.activities;
-
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
@@ -18,22 +17,23 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.example.notes.Note;
 import com.example.notes.R;
+import com.example.notes.database.NotesDatabase;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.Executors;
 
 public class CreateNoteActivity extends AppCompatActivity {
 
     public static final int REQUEST_CODE_DELETE_NOTE = 3;
-
     private AlertDialog dialogDeleteNote;
-
     private EditText inputNoteTitle, inputNoteSubtitle, inputNoteText;
     private TextView textDateTime;
     private View viewSubtitleIndicator;
     private String selectedNoteColor;
     private Note alreadyAvailableNote;
+    private NotesDatabase db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,9 +54,8 @@ public class CreateNoteActivity extends AppCompatActivity {
         inputNoteText = findViewById(R.id.inputNote);
         textDateTime = findViewById(R.id.textDateTime);
         viewSubtitleIndicator = findViewById(R.id.viewSubtitleIndicator);
-
         textDateTime.setText(
-                new SimpleDateFormat("EEEE, dd MMMM yyyy HH:mm a", Locale.getDefault())
+                new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                 .format(new Date())
         );
 
@@ -69,6 +68,8 @@ public class CreateNoteActivity extends AppCompatActivity {
             }
         });
 
+        db = NotesDatabase.getInstance(this);
+
         if (getIntent().getBooleanExtra("isViewOrUpdate", false)) {
             alreadyAvailableNote = (Note) getIntent().getSerializableExtra("note");
             setViewOrUpdateNote();
@@ -80,12 +81,13 @@ public class CreateNoteActivity extends AppCompatActivity {
 
     }
     /* Функция устанавливает поля для просмотра существующей заметки */
-    private void setViewOrUpdateNote() {
+    private  void setViewOrUpdateNote() {
         inputNoteTitle.setText(alreadyAvailableNote.getTitle());
         inputNoteSubtitle.setText(alreadyAvailableNote.getSubtitle());
         inputNoteText.setText(alreadyAvailableNote.getNoteText());
         textDateTime.setText(alreadyAvailableNote.getDateTime());
-    }
+
+    };
 
     private void saveNote() {
         if(inputNoteTitle.getText().toString().trim().isEmpty()) {
@@ -95,18 +97,30 @@ public class CreateNoteActivity extends AppCompatActivity {
             Toast.makeText(this, "Note can't be empty!", Toast.LENGTH_SHORT).show();
             return;
         }
-        final Note note = new Note();
-        note.setTitle(inputNoteTitle.getText().toString());
-        note.setSubtitle(inputNoteSubtitle.getText().toString());
-        note.setNoteText(inputNoteText.getText().toString());
-        note.setDateTime(textDateTime.getText().toString());
-        note.setColor(selectedNoteColor);
 
-        Intent intent = new Intent();
-        intent.putExtra("note", note);
-        setResult(RESULT_OK, intent);
 
-        finish();
+        final Note note = new Note(inputNoteTitle.getText().toString(), textDateTime.getText().toString(), inputNoteSubtitle.getText().toString(),
+                inputNoteText.getText().toString(),  selectedNoteColor);
+
+        if (alreadyAvailableNote != null) note.setId(alreadyAvailableNote.getId());
+        Executors.newSingleThreadExecutor().execute(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        for (int i = 0; i < 1000000; i++){};
+                        db.noteDAO().insertNote(note);
+
+                        CreateNoteActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Intent intent = new Intent();
+                                setResult(RESULT_OK, intent);
+                                finish();
+                            }
+                        });
+                    }
+                }
+        );
     }
 
     private void initMiscellaneous() {
@@ -219,11 +233,8 @@ public class CreateNoteActivity extends AppCompatActivity {
                         layoutMiscellaneous.findViewById(R.id.viewColor5).performClick();
                         break;
                 }
-
             }
-
         }
-
     }
     /* Функция меняет цвет индикатора при выборе другого цвета заметки */
     private void setSubtitleIndicatorColor() {
@@ -245,6 +256,12 @@ public class CreateNoteActivity extends AppCompatActivity {
             view.findViewById(R.id.textDeleteNote).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    Executors.newSingleThreadExecutor().execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            db.noteDAO().deleteNoteById(alreadyAvailableNote.getId());
+                        }
+                    });
                     setResult(REQUEST_CODE_DELETE_NOTE, null);
                     finish();
                 }

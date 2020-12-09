@@ -1,5 +1,4 @@
 package com.example.notes.activities;
-
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.RecyclerView;
@@ -14,13 +13,15 @@ import android.widget.ImageView;
 import com.example.notes.Note;
 import com.example.notes.R;
 import com.example.notes.adapters.NotesAdapter;
+import com.example.notes.database.NotesDatabase;
 import com.example.notes.listeners.NotesListener;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity implements NotesListener {
 
+    public static final int REQUEST_CODE_SHOW_NOTES = 0;
     public static final int REQUEST_CODE_ADD_NOTE = 1;
     public static final int REQUEST_CODE_UPDATE_NOTE = 2;
     public static final int REQUEST_CODE_DELETE_NOTE = 3;
@@ -28,8 +29,9 @@ public class MainActivity extends AppCompatActivity implements NotesListener {
     private RecyclerView notesRecyclerView;
     private List<Note> noteList;
     private NotesAdapter notesAdapter;
-
     private int noteClickedPosition = -1;
+
+    private NotesDatabase db;
 
 
     @Override
@@ -51,9 +53,13 @@ public class MainActivity extends AppCompatActivity implements NotesListener {
         StaggeredGridLayoutManager layoutManager = new StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL);
         notesRecyclerView.setLayoutManager(layoutManager);
 
+        db = NotesDatabase.getInstance(this);
+
         noteList = new ArrayList<>();
-        notesAdapter = new NotesAdapter(noteList, this);
+        notesAdapter = new NotesAdapter(noteList, MainActivity.this);
         notesRecyclerView.setAdapter(notesAdapter);
+
+        getNotes(REQUEST_CODE_SHOW_NOTES);
 
         final EditText inputSearch = findViewById(R.id.inputSearch);
 
@@ -74,51 +80,55 @@ public class MainActivity extends AppCompatActivity implements NotesListener {
             }
         });
 
-
-        Note note = new Note();
-        note.setTitle("This is a note with a color");
-        note.setSubtitle("");
-        note.setNoteText("You can choose another color which you like.");
-        note.setDateTime(new Date().toString());
-        note.setColor("#FDBE3B");
-        noteList.add(0, note);
-        notesAdapter.notifyItemInserted(0);
-
-        Note note1 = new Note();
-        note1.setTitle("Welcome to the Notes app!");
-        note1.setSubtitle("Click on this note to open it...");
-        note1.setDateTime(new Date().toString());
-        note1.setNoteText("Here is the note window. You can edit this note or do whatever you want.");
-        noteList.add(0, note1);
-        notesAdapter.notifyItemInserted(0);
-
-
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (data == null) { // Если не было получено данных то значит было запрошено удаление заметки
-            if (resultCode == REQUEST_CODE_DELETE_NOTE) {
-                noteList.remove(noteClickedPosition);
-                notesAdapter.notifyItemRemoved(noteClickedPosition);
-            }
-            return;
+        if (data == null && resultCode == REQUEST_CODE_DELETE_NOTE) { // Если не было получено данных то значит было запрошено удаление заметки
+            getNotes(REQUEST_CODE_DELETE_NOTE);
         }
-        Note note = (Note) data.getSerializableExtra("note");
         // если был послан запрос на обновление и получен код об успешном завершении
         // тогда обновляем существующую заметку
         if (requestCode == REQUEST_CODE_UPDATE_NOTE && resultCode == RESULT_OK) {
-            noteList.set(noteClickedPosition, note);
-            notesAdapter.notifyItemChanged(noteClickedPosition);
+            getNotes(REQUEST_CODE_UPDATE_NOTE);
         }
         // если был послан запрос на добавление и получено код об успешном завершении
         // тогда добавляем полученную заметку
         if (requestCode == REQUEST_CODE_ADD_NOTE && resultCode == RESULT_OK) {
-            noteList.add(0, note);
-            notesAdapter.notifyItemInserted(0);
+            getNotes(REQUEST_CODE_ADD_NOTE);
         }
+    }
+
+    private void getNotes(final int REQUEST_CODE) {
+        Executors.newSingleThreadExecutor().execute(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        final List<Note> data = new ArrayList<>(db.noteDAO().getNotes());
+                        MainActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (REQUEST_CODE == REQUEST_CODE_SHOW_NOTES) {
+                                    noteList.addAll(data);
+                                    notesAdapter.notifyDataSetChanged();
+                                } else if (REQUEST_CODE == REQUEST_CODE_ADD_NOTE) {
+                                    noteList.add(0, data.get(0));
+                                    notesAdapter.notifyItemInserted(0);
+                                } else if (REQUEST_CODE == REQUEST_CODE_UPDATE_NOTE) {
+                                    noteList.remove(noteClickedPosition);
+                                    noteList.add(noteClickedPosition, data.get(noteClickedPosition));
+                                    notesAdapter.notifyItemChanged(noteClickedPosition);
+                                } else if (REQUEST_CODE == REQUEST_CODE_DELETE_NOTE) {
+                                    noteList.remove(noteClickedPosition);
+                                    notesAdapter.notifyItemRemoved(noteClickedPosition);
+                                }
+                            }
+                        });
+                    }
+                }
+        );
     }
 
     @Override
