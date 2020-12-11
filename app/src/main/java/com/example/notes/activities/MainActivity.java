@@ -1,6 +1,7 @@
 package com.example.notes.activities;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.StaggeredGridLayoutManager;
 import android.content.Intent;
@@ -13,11 +14,10 @@ import android.widget.ImageView;
 import com.example.notes.Note;
 import com.example.notes.R;
 import com.example.notes.adapters.NotesAdapter;
-import com.example.notes.database.NotesDatabase;
 import com.example.notes.listeners.NotesListener;
+import com.example.notes.viewModels.MainViewModel;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity implements NotesListener {
 
@@ -31,7 +31,7 @@ public class MainActivity extends AppCompatActivity implements NotesListener {
     private NotesAdapter notesAdapter;
     private int noteClickedPosition = -1;
 
-    private NotesDatabase db;
+    private MainViewModel mViewModel;
 
 
     @Override
@@ -53,7 +53,7 @@ public class MainActivity extends AppCompatActivity implements NotesListener {
         StaggeredGridLayoutManager layoutManager = new StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL);
         notesRecyclerView.setLayoutManager(layoutManager);
 
-        db = NotesDatabase.getInstance(this);
+        initViewModel();
 
         noteList = new ArrayList<>();
         notesAdapter = new NotesAdapter(noteList, MainActivity.this);
@@ -102,33 +102,25 @@ public class MainActivity extends AppCompatActivity implements NotesListener {
     }
 
     private void getNotes(final int REQUEST_CODE) {
-        Executors.newSingleThreadExecutor().execute(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        final List<Note> data = new ArrayList<>(db.noteDAO().getNotes());
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (REQUEST_CODE == REQUEST_CODE_SHOW_NOTES) {
-                                    noteList.addAll(data);
-                                    notesAdapter.notifyDataSetChanged();
-                                } else if (REQUEST_CODE == REQUEST_CODE_ADD_NOTE) {
-                                    noteList.add(0, data.get(0));
-                                    notesAdapter.notifyItemInserted(0);
-                                } else if (REQUEST_CODE == REQUEST_CODE_UPDATE_NOTE) {
-                                    noteList.remove(noteClickedPosition);
-                                    noteList.add(noteClickedPosition, data.get(noteClickedPosition));
-                                    notesAdapter.notifyItemChanged(noteClickedPosition);
-                                } else if (REQUEST_CODE == REQUEST_CODE_DELETE_NOTE) {
-                                    noteList.remove(noteClickedPosition);
-                                    notesAdapter.notifyItemRemoved(noteClickedPosition);
-                                }
-                            }
-                        });
-                    }
-                }
-        );
+
+        final List<Note> data = new ArrayList<>(mViewModel.getAllNotes());
+
+        if (REQUEST_CODE == REQUEST_CODE_SHOW_NOTES) {
+            noteList.addAll(data);
+            notesAdapter.notifyDataSetChanged();
+        } else if (REQUEST_CODE == REQUEST_CODE_ADD_NOTE) {
+            noteList.add(0, data.get(0));
+            notesAdapter.notifyItemInserted(0);
+            notesRecyclerView.smoothScrollToPosition(0);
+        } else if (REQUEST_CODE == REQUEST_CODE_UPDATE_NOTE) {
+            noteList.remove(noteClickedPosition);
+            noteList.add(noteClickedPosition, data.get(noteClickedPosition));
+            notesAdapter.notifyItemChanged(noteClickedPosition);
+        } else if (REQUEST_CODE == REQUEST_CODE_DELETE_NOTE) {
+            noteList.remove(noteClickedPosition);
+            notesAdapter.notifyItemRemoved(noteClickedPosition);
+        }
+
     }
 
     @Override
@@ -137,7 +129,7 @@ public class MainActivity extends AppCompatActivity implements NotesListener {
         noteClickedPosition = position;
         Intent intent = new Intent(getApplicationContext(), CreateNoteActivity.class);
         intent.putExtra("isViewOrUpdate", true);
-        intent.putExtra("note", note);
+        intent.putExtra("note_id", note.getId());
         startActivityForResult(intent, REQUEST_CODE_UPDATE_NOTE);
         clearInputSearchOrClearFocus();
     }
@@ -147,6 +139,14 @@ public class MainActivity extends AppCompatActivity implements NotesListener {
         EditText inputSearch = findViewById(R.id.inputSearch);
         inputSearch.setText("");
         inputSearch.clearFocus();
+    }
+
+
+    private void initViewModel() {
+        mViewModel = new ViewModelProvider(this, ViewModelProvider
+                .AndroidViewModelFactory
+                .getInstance(this.getApplication()))
+                .get(MainViewModel.class);
     }
 
 }

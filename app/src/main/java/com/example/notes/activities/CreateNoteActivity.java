@@ -1,6 +1,7 @@
 package com.example.notes.activities;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.ViewModelProvider;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
@@ -17,12 +18,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.example.notes.Note;
 import com.example.notes.R;
-import com.example.notes.database.NotesDatabase;
+import com.example.notes.viewModels.NoteViewModel;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
-import java.util.concurrent.Executors;
 
 public class CreateNoteActivity extends AppCompatActivity {
 
@@ -33,7 +33,7 @@ public class CreateNoteActivity extends AppCompatActivity {
     private View viewSubtitleIndicator;
     private String selectedNoteColor;
     private Note alreadyAvailableNote;
-    private NotesDatabase db;
+    private NoteViewModel nViewModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,10 +68,10 @@ public class CreateNoteActivity extends AppCompatActivity {
             }
         });
 
-        db = NotesDatabase.getInstance(this);
+        initViewModel();
 
         if (getIntent().getBooleanExtra("isViewOrUpdate", false)) {
-            alreadyAvailableNote = (Note) getIntent().getSerializableExtra("note");
+            alreadyAvailableNote = nViewModel.getNoteById(getIntent().getIntExtra("note_id", -1));
             setViewOrUpdateNote();
         }
 
@@ -103,24 +103,11 @@ public class CreateNoteActivity extends AppCompatActivity {
                 inputNoteText.getText().toString(),  selectedNoteColor);
 
         if (alreadyAvailableNote != null) note.setId(alreadyAvailableNote.getId());
-        Executors.newSingleThreadExecutor().execute(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        for (int i = 0; i < 1000000; i++){};
-                        db.noteDAO().insertNote(note);
 
-                        CreateNoteActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Intent intent = new Intent();
-                                setResult(RESULT_OK, intent);
-                                finish();
-                            }
-                        });
-                    }
-                }
-        );
+        nViewModel.insertNote(note);
+        Intent intent = new Intent();
+        setResult(RESULT_OK, intent);
+        finish();
     }
 
     private void initMiscellaneous() {
@@ -256,12 +243,7 @@ public class CreateNoteActivity extends AppCompatActivity {
             view.findViewById(R.id.textDeleteNote).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    Executors.newSingleThreadExecutor().execute(new Runnable() {
-                        @Override
-                        public void run() {
-                            db.noteDAO().deleteNoteById(alreadyAvailableNote.getId());
-                        }
-                    });
+                    nViewModel.deleteNoteById(alreadyAvailableNote.getId());
                     setResult(REQUEST_CODE_DELETE_NOTE, null);
                     finish();
                 }
@@ -281,6 +263,13 @@ public class CreateNoteActivity extends AppCompatActivity {
     public void closeKeyboard(View v) {
         InputMethodManager inputMethodManager = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
         inputMethodManager.hideSoftInputFromWindow(v.getApplicationWindowToken(),0);
+    }
+
+    private void initViewModel() {
+        nViewModel = new ViewModelProvider(this, ViewModelProvider
+                .AndroidViewModelFactory
+                .getInstance(this.getApplication()))
+                .get(NoteViewModel.class);
     }
 
 }

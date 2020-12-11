@@ -48,11 +48,11 @@ public class NotesRepository {
         return data;
     }
 
-    public void deleteNoteById(final int id) {
+    public void deleteNoteById(final int note_id) {
         executor.execute(new Runnable() {
             @Override
             public void run() {
-                db.noteDAO().deleteNoteById(id);
+                db.noteDAO().deleteNoteById(note_id);
             }
         });
     }
@@ -75,12 +75,12 @@ public class NotesRepository {
         });
     }
 
-    public Note getNoteById(final int id) {
+    public Note getNoteById(final int note_id) {
         ExecutorService es = Executors.newSingleThreadExecutor();
         Future<Note> result = es.submit(new Callable<Note>() {
             @Override
             public Note call() throws Exception {
-                return db.noteDAO().getNoteById(id);
+                return db.noteDAO().getNoteById(note_id);
             }
         });
 

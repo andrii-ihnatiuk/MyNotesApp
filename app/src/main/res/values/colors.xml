@@ -18,5 +18,5 @@
     <color name="colorNoteColor4">#3A52Fc</color>
     <color name="colorNoteColor5">#000000</color>
     <color name="colorDelete">#FF4842</color>
-    <color name="searchBackground">#2B2B2B</color>
+    <color name="searchBackground">#333333</color>
 </resources>
